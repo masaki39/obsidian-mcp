@@ -1,6 +1,6 @@
 {
   "name": "@masaki39/obsidian-mcp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "MCP server exposing the active Obsidian file (path and content) via Local REST API",
   "main": "./build/index.js",
   "scripts": {
