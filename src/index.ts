@@ -2,6 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import path from "path";
 
 type FetchLike = typeof fetch;
 
@@ -16,12 +17,14 @@ const ACTIVE_PATH = "/active/";
 class ObsidianRestClient {
   private readonly baseUrl: string;
   private readonly token?: string;
+  private readonly vaultPath?: string;
   private readonly fetchImpl: FetchLike;
 
-  constructor(options: { token?: string; fetchImpl?: FetchLike } = {}) {
-    const { token, fetchImpl = fetch } = options;
+  constructor(options: { token?: string; vaultPath?: string; fetchImpl?: FetchLike } = {}) {
+    const { token, vaultPath, fetchImpl = fetch } = options;
     this.baseUrl = DEFAULT_BASE_URL;
     this.token = token;
+    this.vaultPath = vaultPath;
     this.fetchImpl = fetchImpl;
   }
 
@@ -50,12 +53,23 @@ class ObsidianRestClient {
       throw new Error("Active file path or content is missing in Obsidian REST API response.");
     }
 
-    return { path, content };
+    return { path: this.resolvePath(path), content };
+  }
+
+  private resolvePath(filePath: string): string {
+    if (path.isAbsolute(filePath) || !this.vaultPath) {
+      return filePath;
+    }
+    return path.resolve(this.vaultPath, filePath);
   }
 }
 
 function getEnvToken(): string | undefined {
   return process.env.OBSIDIAN_API_KEY;
+}
+
+function getEnvVaultPath(): string | undefined {
+  return process.env.OBSIDIAN_VAULT_PATH;
 }
 
 async function runServer() {
@@ -67,11 +81,11 @@ async function runServer() {
   server.registerTool(
     "get_active_file",
     {
-      description: "Return the absolute path and content of the active Obsidian file via Local REST API.",
+      description: "Return the path and content of the active Obsidian file via Local REST API.",
       inputSchema: z.object({}).describe("No input required."),
     },
     async () => {
-      const client = new ObsidianRestClient({ token: getEnvToken() });
+      const client = new ObsidianRestClient({ token: getEnvToken(), vaultPath: getEnvVaultPath() });
       const activeFile = await client.getActiveFile();
 
       return {
