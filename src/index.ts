@@ -103,11 +103,9 @@ async function runServer() {
   await server.connect(transport);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runServer().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-}
+runServer().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 
 export { ObsidianRestClient, DEFAULT_BASE_URL, runServer };
