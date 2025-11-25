@@ -18,11 +18,9 @@ npm install -g .
 ```
 
 ## Configuration
-The server reads these environment variables:
-- `OBSIDIAN_REST_API_BASE_URL` (optional): defaults to `https://127.0.0.1:27124`.
-- `OBSIDIAN_REST_API_TOKEN` or `OBSIDIAN_LOCAL_REST_API_KEY`: bearer token for the Obsidian Local REST API plugin.
+Base URL is fixed to `http://127.0.0.1:27123` (HTTP only). If your Obsidian Local REST API requires a token (default), set `OBSIDIAN_API_KEY`.
 
-The server calls `/active/` and accepts either the `Content-Location` header or the `Content-Disposition` filename as the active file path.
+The server calls `/active/` with `Accept: application/vnd.olrapi.note+json`, expects JSON, and returns `{ path, content }` from the response body to the MCP client.
 
 ## Running as an MCP server
 After building, start the server:

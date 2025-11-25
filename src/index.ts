@@ -10,74 +10,52 @@ export interface ActiveFileResult {
   content: string;
 }
 
-const DEFAULT_BASE_URL = "https://127.0.0.1:27124";
-const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_BASE_URL = "http://127.0.0.1:27123";
 const ACTIVE_PATH = "/active/";
 
 class ObsidianRestClient {
   private readonly baseUrl: string;
   private readonly token?: string;
   private readonly fetchImpl: FetchLike;
-  private readonly timeoutMs: number;
 
-  constructor(options: { baseUrl?: string; token?: string; fetchImpl?: FetchLike; timeoutMs?: number }) {
-    const { baseUrl = DEFAULT_BASE_URL, token, fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
+  constructor(options: { token?: string; fetchImpl?: FetchLike } = {}) {
+    const { token, fetchImpl = fetch } = options;
+    this.baseUrl = DEFAULT_BASE_URL;
     this.token = token;
     this.fetchImpl = fetchImpl;
-    this.timeoutMs = timeoutMs;
   }
 
   async getActiveFile(): Promise<ActiveFileResult> {
-    const response = await this.request(ACTIVE_PATH, { headers: { Accept: "text/markdown,text/plain" } });
-    const content = await response.text();
-    const path = this.extractPathFromHeaders(response.headers);
-    if (!path || typeof path !== "string") {
-      throw new Error("Active file path is missing in Obsidian REST API response headers.");
+    const headers: Record<string, string> = { Accept: "application/vnd.olrapi.note+json" };
+    if (this.token && this.token.length > 0) {
+      headers.Authorization = `Bearer ${this.token}`;
     }
-    return { path, content };
-  }
 
-  private extractPathFromHeaders(headers: Headers): string | undefined {
-    const location = headers.get("Content-Location");
-    if (location) {
-      return decodeURIComponent(location);
-    }
-    const disposition = headers.get("Content-Disposition");
-    if (disposition) {
-      const match = disposition.match(/filename="?([^";]+)"?/i);
-      if (match?.[1]) {
-        return decodeURIComponent(match[1]);
-      }
-    }
-    return undefined;
-  }
-
-  private async request(path: string, init: RequestInit = {}): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const headers =
-      this.token && this.token.length > 0
-        ? { Authorization: `Bearer ${this.token}`, ...(init.headers ?? {}) }
-        : { ...(init.headers ?? {}) };
-
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      ...init,
-      headers,
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeout));
-
+    const response = await this.fetchImpl(`${this.baseUrl}${ACTIVE_PATH}`, { headers });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Obsidian REST API request failed (${response.status} ${response.statusText}): ${body}`);
     }
 
-    return response;
+    const json = await response.json().catch(() => null);
+    const path = json && typeof json.path === "string" ? json.path : undefined;
+    const content =
+      json && typeof json.content === "string"
+        ? json.content
+        : json && typeof json.body === "string"
+          ? json.body
+          : undefined;
+
+    if (!path || !content) {
+      throw new Error("Active file path or content is missing in Obsidian REST API response.");
+    }
+
+    return { path, content };
   }
 }
 
 function getEnvToken(): string | undefined {
-  return process.env.OBSIDIAN_REST_API_TOKEN ?? process.env.OBSIDIAN_LOCAL_REST_API_KEY;
+  return process.env.OBSIDIAN_API_KEY;
 }
 
 async function runServer() {
@@ -93,11 +71,7 @@ async function runServer() {
       inputSchema: z.object({}).describe("No input required."),
     },
     async () => {
-      const token = getEnvToken();
-      const client = new ObsidianRestClient({
-        baseUrl: process.env.OBSIDIAN_REST_API_BASE_URL,
-        token,
-      });
+      const client = new ObsidianRestClient({ token: getEnvToken() });
       const activeFile = await client.getActiveFile();
 
       return {
@@ -122,4 +96,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { ObsidianRestClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT_MS, runServer };
+export { ObsidianRestClient, DEFAULT_BASE_URL, runServer };
