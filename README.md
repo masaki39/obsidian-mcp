@@ -1,5 +1,7 @@
 # obsidian-mcp
 
+![NPM Downloads](https://img.shields.io/npm/dt/%40masaki39%2Fobsidian-mcp)
+
 Simple MCP server that provides the active Obsidian file (path and content) to your LLM via the Obsidian Local REST API.
 
 ## Prerequisites
